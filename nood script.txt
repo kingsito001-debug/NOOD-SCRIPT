@@ -1,0 +1,399 @@
+-- NOOD SCRIPT v5.0 - MENU CONTROL TOTAL
+-- Click en el botón = ON, otro click = OFF
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Estado de funciones (todo empieza apagado)
+local Features = {
+    Aimbot = false,
+    ESP = false,
+    Fly = false,
+    Speed = false,
+    Wallhack = false
+}
+
+-- Configuración
+local Settings = {
+    SpeedValue = 25,
+    FlySpeed = 60,
+    AimSmooth = 0.1,
+    AimFOV = 15
+}
+
+-- Variables internas
+local ESPObjects = {}
+local FlyConnection = nil
+local AimConnection = nil
+
+-- Crear GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = HttpService:GenerateGUID(false)
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ResetOnSpawn = false
+
+-- Marco principal (ventanita)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "NoodMenu"
+MainFrame.Size = UDim2.new(0, 180, 0, 250)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 8)
+Corner.Parent = MainFrame
+
+-- Barra de título
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -30, 1, 0)
+Title.Position = UDim2.new(0, 5, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "NOOD SCRIPT"
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+-- Botón cerrar
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -27, 0, 2)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 12
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+
+-- Función crear botón toggle
+local function CreateToggleButton(name, yPos, colorOn)
+    local Btn = Instance.new("TextButton")
+    Btn.Name = name .. "Btn"
+    Btn.Size = UDim2.new(0.9, 0, 0, 35)
+    Btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Btn.Text = name .. "\n[OFF]"
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.TextSize = 12
+    Btn.Font = Enum.Font.GothamBold
+    Btn.Parent = MainFrame
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = Btn
+    
+    return Btn
+end
+
+-- Crear botones
+local AimbotBtn = CreateToggleButton("AIMBOT", 40, Color3.fromRGB(255, 50, 50))
+local ESPBtn = CreateToggleButton("ESP", 80, Color3.fromRGB(50, 150, 255))
+local FlyBtn = CreateToggleButton("FLY", 120, Color3.fromRGB(255, 200, 50))
+local SpeedBtn = CreateToggleButton("SPEED", 160, Color3.fromRGB(50, 255, 100))
+local WallhackBtn = CreateToggleButton("WALLHACK", 200, Color3.fromRGB(200, 50, 255))
+
+-- Controles de velocidad (aparecen cuando activas speed)
+local SpeedControl = Instance.new("Frame")
+SpeedControl.Size = UDim2.new(0.9, 0, 0, 30)
+SpeedControl.Position = UDim2.new(0.05, 0, 0, 240)
+SpeedControl.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SpeedControl.Visible = false
+SpeedControl.Parent = MainFrame
+
+local SpeedControlCorner = Instance.new("UICorner")
+SpeedControlCorner.CornerRadius = UDim.new(0, 6)
+SpeedControlCorner.Parent = SpeedControl
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.3, 0, 1, 0)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Text = "25"
+SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedLabel.TextSize = 14
+SpeedLabel.Font = Enum.Font.GothamBold
+SpeedLabel.Parent = SpeedControl
+
+local SpeedMinus = Instance.new("TextButton")
+SpeedMinus.Size = UDim2.new(0.3, 0, 1, 0)
+SpeedMinus.Position = UDim2.new(0.35, 0, 0, 0)
+SpeedMinus.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+SpeedMinus.Text = "-"
+SpeedMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedMinus.TextSize = 16
+SpeedMinus.Font = Enum.Font.GothamBold
+SpeedMinus.Parent = SpeedControl
+
+local SpeedPlus = Instance.new("TextButton")
+SpeedPlus.Size = UDim2.new(0.3, 0, 1, 0)
+SpeedPlus.Position = UDim2.new(0.7, 0, 0, 0)
+SpeedPlus.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+SpeedPlus.Text = "+"
+SpeedPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedPlus.TextSize = 16
+SpeedPlus.Font = Enum.Font.GothamBold
+SpeedPlus.Parent = SpeedControl
+
+-- =====================================================
+-- FUNCIONES DE CADA HACK
+-- =====================================================
+
+-- AIMBOT
+local function ToggleAimbot(enabled)
+    Features.Aimbot = enabled
+    if enabled then
+        -- Conectar aimbot
+        AimConnection = RunService.RenderStepped:Connect(function()
+            if not Features.Aimbot then return end
+            
+            local closest = nil
+            local shortestDist = math.huge
+            local mousePos = UserInputService:GetMouseLocation()
+            
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+                    local head = player.Character.Head
+                    local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    
+                    if onScreen then
+                        local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                        if dist < Settings.AimFOV * 10 then
+                            if dist < shortestDist then
+                                shortestDist = dist
+                                closest = head
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if closest then
+                local pos = Camera:WorldToViewportPoint(closest.Position)
+                -- Movimiento suave hacia el objetivo
+                local current = UserInputService:GetMouseLocation()
+                local target = Vector2.new(pos.X, pos.Y)
+                local smooth = Vector2.new(
+                    current.X + (target.X - current.X) * Settings.AimSmooth,
+                    current.Y + (target.Y - current.Y) * Settings.AimSmooth
+                )
+                VirtualInputManager:SendMouseMoveEvent(smooth.X, smooth.Y, game)
+            end
+        end)
+    else
+        -- Desconectar aimbot
+        if AimConnection then
+            AimConnection:Disconnect()
+            AimConnection = nil
+        end
+    end
+end
+
+-- ESP
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+    
+    local box = Drawing.new("Square")
+    local name = Drawing.new("Text")
+    
+    ESPObjects[player] = {Box = box, Name = name, Player = player}
+end
+
+local function ToggleESP(enabled)
+    Features.ESP = enabled
+    
+    if enabled then
+        -- Crear ESP para jugadores existentes
+        for _, player in ipairs(Players:GetPlayers()) do
+            CreateESP(player)
+        end
+        
+        -- Conectar actualización
+        RunService.RenderStepped:Connect(function()
+            if not Features.ESP then
+                for _, obj in pairs(ESPObjects) do
+                    obj.Box.Visible = false
+                    obj.Name.Visible = false
+                end
+                return
+            end
+            
+            for _, obj in pairs(ESPObjects) do
+                if obj.Player.Character and obj.Player.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = obj.Player.Character.HumanoidRootPart
+                    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                    
+                    if onScreen then
+                        local size = 1000 / pos.Z
+                        obj.Box.Size = Vector2.new(size, size * 1.5)
+                        obj.Box.Position = Vector2.new(pos.X - size/2, pos.Y - size*1.5/2)
+                        obj.Box.Color = Color3.fromRGB(255, 50, 50)
+                        obj.Box.Thickness = 1
+                        obj.Box.Visible = true
+                        
+                        obj.Name.Text = obj.Player.Name
+                        obj.Name.Position = Vector2.new(pos.X, pos.Y - size*1.5/2 - 15)
+                        obj.Name.Color = Color3.fromRGB(255, 255, 255)
+                        obj.Name.Size = 12
+                        obj.Name.Center = true
+                        obj.Name.Visible = true
+                    else
+                        obj.Box.Visible = false
+                        obj.Name.Visible = false
+                    end
+                else
+                    obj.Box.Visible = false
+                    obj.Name.Visible = false
+                end
+            end
+        end)
+    else
+        -- Ocultar todo
+        for _, obj in pairs(ESPObjects) do
+            obj.Box.Visible = false
+            obj.Name.Visible = false
+        end
+    end
+end
+
+-- FLY
+local function ToggleFly(enabled)
+    Features.Fly = enabled
+    
+    if enabled then
+        FlyConnection = RunService.RenderStepped:Connect(function()
+            if not Features.Fly then return end
+            
+            local char = LocalPlayer.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            
+            local hrp = char.HumanoidRootPart
+            local cam = Workspace.CurrentCamera
+            local velocity = Vector3.new(0, 0, 0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                velocity = velocity + cam.CFrame.LookVector * Settings.FlySpeed
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                velocity = velocity - cam.CFrame.LookVector * Settings.FlySpeed
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                velocity = velocity - cam.CFrame.RightVector * Settings.FlySpeed
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                velocity = velocity + cam.CFrame.RightVector * Settings.FlySpeed
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                velocity = velocity + Vector3.new(0, Settings.FlySpeed, 0)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                velocity = velocity - Vector3.new(0, Settings.FlySpeed, 0)
+            end
+            
+            hrp.Velocity = velocity
+            hrp.Anchored = velocity == Vector3.new(0, 0, 0)
+        end)
+    else
+        if FlyConnection then
+            FlyConnection:Disconnect()
+            FlyConnection = nil
+        end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.Anchored = false
+        end
+    end
+end
+
+-- SPEED
+local function ToggleSpeed(enabled)
+    Features.Speed = enabled
+    SpeedControl.Visible = enabled
+    
+    local function updateSpeed()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").WalkSpeed = enabled and Settings.SpeedValue or 16
+        end
+    end
+    
+    if enabled then
+        updateSpeed()
+        LocalPlayer.CharacterAdded:Connect(function(char)
+            if Features.Speed then
+                char:WaitForChild("Humanoid").WalkSpeed = Settings.SpeedValue
+            end
+        end)
+    else
+        updateSpeed()
+    end
+end
+
+-- WALLHACK
+local function ToggleWallhack(enabled)
+    Features.Wallhack = enabled
+    
+    for _, part in ipairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not part:IsDescendantOf(LocalPlayer.Character) then
+            if enabled then
+                part.Transparency = 0.8
+            else
+                part.Transparency = 0
+            end
+        end
+    end
+end
+
+-- =====================================================
+-- CONEXIONES DE BOTONES (CLICK = ACTIVAR/DESACTIVAR)
+-- =====================================================
+
+local function UpdateButton(btn, feature, color)
+    if feature then
+        btn.BackgroundColor3 = color
+        btn.Text = btn.Text:gsub("%[OFF%]", "[ON]")
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    else
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        btn.Text = btn.Text:gsub("%[ON%]", "[OFF]")
+        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end
+
+AimbotBtn.MouseButton1Click:Connect(function()
+    ToggleAimbot(not Features.Aimbot)
+    UpdateButton(AimbotBtn, Features.Aimbot, Color3.fromRGB(255, 50, 50))
+end)
+
+ESPBtn.MouseButton1Click:Connect(function()
+    ToggleESP(not Features.ESP)
+    UpdateButton(ESPBtn, Features.ESP, Color3.fromRGB(50, 150, 255))
+end)
+
+FlyBtn.MouseButton1Click:Connect(function()
+    ToggleFly(not Features.Fly)
+    UpdateButton(FlyBtn, Features.Fly, Color3.fromRGB(255, 200, 50))
+end)
+
+SpeedBtn.MouseButton1Click:Connect(function()
+    ToggleSpeed
